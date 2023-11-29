@@ -5,7 +5,7 @@
 # Variables to control Makefile operation
 
 NVCC = nvcc
-NVCCFLAGS = -x cu 
+NVCCFLAGS = -x cu -DDEBUG
 CXX = g++
 CXXFLAGS = -Wall 
 
@@ -14,8 +14,8 @@ CXXFLAGS = -Wall
 
 all: example
 
-gpu: main.cpp
-	$(NVCC) $(NVCCFLAGS) main.cpp -o gpu -std=c++11
+gpu: main_binary.cpp
+	$(NVCC) $(NVCCFLAGS) main_binary.cpp -o gpu -std=c++11
 
 cpu: main.cpp
 	$(CXX) $(CXXFLAGS) main.cpp -o cpu -std=c++11

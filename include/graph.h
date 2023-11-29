@@ -2,70 +2,64 @@
 #ifndef GRAPH_H
 #define GRAPH_H
 
-
 #include <unordered_map>
 #include <fstream>
 #include <iostream>
 #include <iomanip>
 #include <string>
 
-
-template <class DataType > 
-class Graph 
+template <class DataType>
+class Graph
 {
-    public:
-        unsigned int N;         //nodes from 0 to N-1
-        unsigned int E;
-        int* offsets;
-        int* edges;
-        DataType* weights;
+public:
+    unsigned int N; // nodes from 0 to N-1
+    unsigned int E;
+    int *offsets;
+    int *edges;
+    DataType *weights;
 
-        std::unordered_map<long,int> vertex_map;     //if vertex doesn't follow 0-1 naming
- 
-        Graph();
+    std::unordered_map<long, int> vertex_map; // if vertex doesn't follow 0-1 naming
 
-        void __alloc__(int n, int e);
+    Graph();
 
-        //void build_graph( FuncType function );
+    void __alloc__(int n, int e);
 
-        int get_num_nodes();
-        int get_num_edges();
+    // void build_graph( FuncType function );
 
-        int* get_offsets();
-        int* get_edges();
-        DataType* get_weights();
+    int get_num_nodes();
+    int get_num_edges();
 
-        void read_graph(std::string filename);
+    int *get_offsets();
+    int *get_edges();
+    DataType *get_weights();
 
-        void free();
-
-        
+    void read_graph(std::string filename);
+    void read_graph_binary(std::string filename);
+    void free();
 };
 
-
-
 /*
-* Implementation Here as 
-* templates cant have diff files for implementation
-* (or move to another file .tpp nand include it here)
-*/
+ * Implementation Here as
+ * templates cant have diff files for implementation
+ * (or move to another file .tpp nand include it here)
+ */
 
-template <class DataType >
-Graph<DataType >::Graph()
+template <class DataType>
+Graph<DataType>::Graph()
 {
     N = 0;
     E = 0;
 }
 
-template <class DataType >
-void Graph<DataType > :: __alloc__(int n, int e){
+template <class DataType>
+void Graph<DataType>::__alloc__(int n, int e)
+{
     N = n;
     E = e;
-    this->offsets = (int*)malloc(sizeof(int)*N);
-    this->edges = (int*)malloc(sizeof(int)*E);
-    this->weights = (DataType*)malloc(sizeof(DataType)*E);
+    this->offsets = (int *)malloc(sizeof(int) * N);
+    this->edges = (int *)malloc(sizeof(int) * E);
+    this->weights = (DataType *)malloc(sizeof(DataType) * E);
 }
-
 
 // template <class DataType >
 // void Graph<DataType > :: build_graph(FuncType builder )
@@ -73,58 +67,79 @@ void Graph<DataType > :: __alloc__(int n, int e){
 //     builder(this->offsets,this->edges,this->weights);
 // }
 
-template <class DataType >
-int Graph<DataType > :: get_num_nodes(){ return N; }
+template <class DataType>
+int Graph<DataType>::get_num_nodes() { return N; }
 
-template <class DataType >
-int Graph<DataType > :: get_num_edges(){ return E; }
+template <class DataType>
+int Graph<DataType>::get_num_edges() { return E; }
 
-template <class DataType >
-int* Graph<DataType > :: get_offsets(){ return this->offsets; }
+template <class DataType>
+int *Graph<DataType>::get_offsets() { return this->offsets; }
 
-template <class DataType >
-int*  Graph<DataType > :: get_edges(){ return this->edges; }
+template <class DataType>
+int *Graph<DataType>::get_edges() { return this->edges; }
 
-template <class DataType >
-DataType*  Graph<DataType > :: get_weights(){ return this->weights; }
+template <class DataType>
+DataType *Graph<DataType>::get_weights() { return this->weights; }
 
-
-template <class DataType >
-void Graph<DataType > :: read_graph(std::string filename){
-    std:: ifstream infile;
+template <class DataType>
+void Graph<DataType>::read_graph(std::string filename)
+{
+    std::ifstream infile;
     infile.open(filename);
-    if (!infile){
-        std::cout<<"[ERROR] Couldn't open graph file\n";
+    if (!infile)
+    {
+        std::cout << "[ERROR] Couldn't open graph file\n";
         exit(1);
-    } 
+    }
 
-    int n,e;
+    int n, e;
     infile >> n >> e;
 
-    this->__alloc__(n,e);
-    for(int i=0;i<e;i++){
-       infile >> this->edges[i];
+    this->__alloc__(n, e);
+    for (int i = 0; i < e; i++)
+    {
+        infile >> this->edges[i];
     }
 
-    for(int i=0;i<n;i++){
-       infile >> this->offsets[i];
+    for (int i = 0; i < n; i++)
+    {
+        infile >> this->offsets[i];
     }
 
-    for(int i=0;i<e;i++){
-       infile >> this->weights[i];
+    for (int i = 0; i < e; i++)
+    {
+        infile >> this->weights[i];
     }
-
-
 }
 
+template <class DataType>
+void Graph<DataType>::read_graph_binary(std::string filename)
+{
+    std::FILE *infile = std::fopen(filename.c_str(), "rb");
+    if (!infile)
+    {
+        std::cout << "[ERROR] Couldn't open graph file\n";
+        exit(1);
+    }
 
-template <class DataType >
-void  Graph<DataType > :: free()
+    unsigned int n, e;
+    std::fread(&n, sizeof(n), 1, infile);
+    std::fread(&e, sizeof(e), 1, infile);
+    std::cout << n << " " << e << std::endl;
+    this->__alloc__(n, e);
+    std::fread(this->edges, sizeof(this->edges[0]), e, infile);
+    std::fread(this->offsets, sizeof(this->offsets[0]), n, infile);
+    std::fread(this->weights, sizeof(this->weights[0]), e, infile);
+    std::fclose(infile);
+}
+
+template <class DataType>
+void Graph<DataType>::free()
 {
     free(this->offsets);
     free(this->edges);
     free(this->weights);
 }
-
 
 #endif

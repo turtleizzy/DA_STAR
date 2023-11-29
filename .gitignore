@@ -1,0 +1,6 @@
+.vscode
+
+# generated executives
+gpu
+*.a
+*.o

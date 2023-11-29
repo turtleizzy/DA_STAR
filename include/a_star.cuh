@@ -44,10 +44,10 @@ class GPU_A_Star
 
         void set_heuristics(U* hx);
 
-        std::vector<int> get_path();
+        void get_path(U* cost_array, int* parent_array);
 
         void free_gpu();
-                           
+        void free_memory();
 
 };
 

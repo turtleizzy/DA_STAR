@@ -69,7 +69,6 @@ __global__ void A_star_expand(int* off,int* edge,T* W, U* Hx,int* parent,volatil
     int N,int E, int K,int dest,int* nVFlag ){
        
     int id = blockIdx.x*blockDim.x+threadIdx.x;
-    
     if(id< *expandNodes_size ){
 
         int node = expandNodes[id];

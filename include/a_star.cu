@@ -55,17 +55,13 @@ GPU_A_Star< T, U> :: GPU_A_Star(GPU_Dynamic_Graph<T> *graph, unsigned int start_
     this->parent = (int*)malloc(sizeof(int)*N);
     this->open_list = (int*)malloc(sizeof(int)*N);
 
-    memset(this->parent,-1,sizeof(int)*N);
     memset(this->open_list,-1,sizeof(int)*N);
     memset(this->PQ_size,0,sizeof(int)*K);
+    memset(this->parent,-1,sizeof(int)*N);
 
     is_set_hx = false;
     
-    //todo make it memset
-    for(int i=0;i<N;i++){
-        this->Cx[i] = INT_MAX;
-    }
-
+    for (int i=0;i<N;i++) this->Cx[i] = INT_MAX;
 }
 
 template <class T, class U >
@@ -82,7 +78,7 @@ void GPU_A_Star< T, U> :: __alloc_gpu()
     gpuErrchk ( cudaMalloc(&d_PQ_size,sizeof(unsigned int)*num_pq ) );
 
     gpuErrchk ( cudaMemcpy(d_Cx,Cx,sizeof(U)*N,cudaMemcpyHostToDevice) );
-
+    gpuErrchk ( cudaMemcpy(d_PQ,PQ,sizeof(unsigned int)*N,cudaMemcpyHostToDevice) );
     gpuErrchk ( cudaMemcpy(d_PQ_size,PQ_size,sizeof(unsigned int)*num_pq,cudaMemcpyHostToDevice) );
 
     gpuErrchk ( cudaMemcpy(d_parent,parent,sizeof(int)*N,cudaMemcpyHostToDevice) );
@@ -90,7 +86,30 @@ void GPU_A_Star< T, U> :: __alloc_gpu()
 
 }
 
+template <class T, class U >
+void GPU_A_Star< T, U> :: free_gpu()
+{
 
+    gpuErrchk ( cudaFree(d_Cx) );
+
+    gpuErrchk ( cudaFree(d_parent ) );
+    gpuErrchk ( cudaFree(d_open_list ) );
+
+    gpuErrchk ( cudaFree(d_PQ ) );
+    gpuErrchk ( cudaFree(d_PQ_size ) );
+    gpuErrchk ( cudaFree(d_Hx ) );
+
+}
+
+
+template <class T, class U >
+void GPU_A_Star< T, U> :: free_memory()
+{
+    free(PQ);
+    free(PQ_size);
+    free(Cx);
+    free(open_list);
+}
 
 template <class T, class U >
 void GPU_A_Star< T, U> :: set_heuristics(U* hx)
@@ -106,7 +125,7 @@ void GPU_A_Star< T, U> :: set_heuristics(U* hx)
 
 
 template <class T, class U >
-std::vector<int>  GPU_A_Star< T, U>:: get_path()
+void GPU_A_Star< T, U>:: get_path(U* cost_array, int* parent_array)
 {
 
     int N = this->graph->get_graph().get_num_nodes();
@@ -133,10 +152,14 @@ std::vector<int>  GPU_A_Star< T, U>:: get_path()
     Cx[this->start_node] = Hx[this->start_node];
     PQ[0] = this->start_node;
     PQ_size[0]=1;
-    open_list[this->start_node]=0;  
+    open_list[this->start_node]=0;
 
     //alloc
     __alloc_gpu();
+
+    unsigned int* tmp = (unsigned int*) malloc(sizeof(unsigned int));
+    cudaMemcpy(tmp, d_PQ, sizeof(unsigned int), cudaMemcpyDeviceToHost);
+
 
     //next nodes flag
     int* d_next_vertices_flag;
@@ -198,7 +221,7 @@ std::vector<int>  GPU_A_Star< T, U>:: get_path()
     }
 
 
-    int numThreads = 512;
+    int numThreads = 1024;
     int numBlocks = (K+numThreads-1)/numThreads;
     int N_numBlocks = (N+numThreads-1)/numThreads;
 
@@ -236,7 +259,6 @@ std::vector<int>  GPU_A_Star< T, U>:: get_path()
         //gen from flag d_next_vertices
         //for N in parallel
         setNV<<<N_numBlocks,numThreads>>>(d_next_vertices_flag, d_next_vertices, d_next_vertices_size, N );
-        
         gpuErrchk(cudaPeekAtLastError() );
         cudaDeviceSynchronize();
         
@@ -263,7 +285,6 @@ std::vector<int>  GPU_A_Star< T, U>:: get_path()
             if(PQ_size[i]>0)
                 flag_PQ_not_empty=1;
         }
-
         //check for mins
         if( *flag_found==1 && flag_PQ_not_empty==1){
             //end 
@@ -278,27 +299,30 @@ std::vector<int>  GPU_A_Star< T, U>:: get_path()
    
     }
 
-    getCx < U > <<<1,1>>>( d_Cx, this->end_node,d_dest_cost);
+    // getCx < U > <<<1,1>>>( d_Cx, this->end_node,d_dest_cost);
 
-    U dest_cost;
-    gpuErrchk( cudaMemcpy(&dest_cost,d_dest_cost, sizeof(U),cudaMemcpyDeviceToHost) );
- 
-    gpuErrchk( cudaMemcpy(parent,d_parent, sizeof(int)*N,cudaMemcpyDeviceToHost) );
+    // U dest_cost;
+    // gpuErrchk( cudaMemcpy(&dest_cost,d_dest_cost, sizeof(U),cudaMemcpyDeviceToHost) );
+    
+    gpuErrchk( cudaMemcpy(cost_array, d_Cx, sizeof(U)*N,cudaMemcpyDeviceToHost) );
+    gpuErrchk( cudaMemcpy(parent_array, d_parent, sizeof(int)*N,cudaMemcpyDeviceToHost) );
 
+    // clear up
 
-    std::vector<int> Path;
-    if(dest_cost != INT_MAX){
-        int p = this->end_node;
-        while(parent[p]!=-1){
-            Path.push_back(p); 
-            p = parent[p];
-        }
-        Path.push_back(p); 
-    }
+    gpuErrchk ( cudaFree(d_lock) );
+    gpuErrchk ( cudaFree(d_dest_cost) );    
+    gpuErrchk ( cudaFree(d_next_vertices) );
+    gpuErrchk ( cudaFree(d_next_vertices_size) );
+    gpuErrchk ( cudaFree(d_next_vertices_flag) );
 
-    std::reverse(Path.begin(),Path.end());
-
-    return Path;
+    gpuErrchk ( cudaFree(d_expand_nodes) );  //changed to K
+    gpuErrchk ( cudaFree(d_expand_nodes_size) );
+    gpuErrchk( cudaFree(d_flag_end) );
+    gpuErrchk( cudaFree(d_flag_found) );
+    free(flag_end);
+    free(flag_found);
+    free(__a0);
+    free(next_vertices_flag);
 
 }
 
